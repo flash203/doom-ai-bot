@@ -50,10 +50,9 @@ async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(reply)
 
     except Exception as e:
-        print(e)
-        await update.message.reply_text(
-            "⚠️ AI failed."
-        )
+    await update.message.reply_text(f"❌ Error: {str(e)}")
+    print("FULL ERROR:", e)
+
 
 # ⚙️ Telegram bot setup
 app = ApplicationBuilder().token(TOKEN).build()
