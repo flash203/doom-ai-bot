@@ -1,4 +1,6 @@
 import os
+from urllib.parse import quote
+
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import (
     ApplicationBuilder,
@@ -20,6 +22,12 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 OWNER_ID = 8252102529
 
 # =========================
+# ⚠️ CHECK VARIABLES
+# =========================
+if not TOKEN or not GROQ_API_KEY:
+    raise ValueError("Missing Railway Variables")
+
+# =========================
 # 🤖 GROQ CLIENT
 # =========================
 client = OpenAI(
@@ -32,18 +40,31 @@ client = OpenAI(
 # =========================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-    keyboard = [
-        ["👑 Owner", "👤 Profile"],
-        ["📊 Status"]
-    ]
+    user = update.effective_user
+
+    # 👑 OWNER BUTTONS
+    if user.id == OWNER_ID:
+
+        keyboard = [
+            ["👑 Admin", "👤 Profile"],
+            ["📊 Status", "⚡ Core"],
+            ["🧠 Doom AI"]
+        ]
+
+    # 👤 NORMAL USER BUTTONS
+    else:
+
+        keyboard = [
+            ["👤 Profile", "📊 Status"],
+            ["🧠 Doom AI"]
+        ]
 
     reply_markup = ReplyKeyboardMarkup(
         keyboard,
         resize_keyboard=True
     )
 
-    user = update.effective_user
-
+    # 👑 OWNER MESSAGE
     if user.id == OWNER_ID:
 
         text = (
@@ -51,6 +72,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "⚡ Doom AI systems online."
         )
 
+    # 👤 USER MESSAGE
     else:
 
         text = (
@@ -64,29 +86,41 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 # =========================
+# 👑 ADMIN PANEL
+# =========================
+async def admin_panel(update: Update):
+
+    await update.message.reply_text(
+        "👑 Doom AI Admin Panel\n\n"
+        "⚡ Full system access granted.\n"
+        "🧠 AI Core Stable\n"
+        "🌐 Railway Connected"
+    )
+
+# =========================
 # 🎛 BUTTONS + AI CHAT
 # =========================
 async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     text = update.message.text
     user = update.effective_user
+    user_text = text.lower()
 
     # =========================
-    # 👑 OWNER BUTTON
+    # 👑 ADMIN BUTTON
     # =========================
-    if text == "👑 Owner":
+    if text == "👑 Admin":
 
-        if user.id == OWNER_ID:
-
-            await update.message.reply_text(
-                "👑 You are the creator of Doom AI."
-            )
-
-        else:
+        if user.id != OWNER_ID:
 
             await update.message.reply_text(
-                "👑 Doom AI Owner: @Alphaxdoom"
+                "⛔ Access denied."
             )
+
+            return
+
+        await admin_panel(update)
+        return
 
     # =========================
     # 👤 PROFILE BUTTON
@@ -104,6 +138,8 @@ async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"🎭 Role: {role}"
         )
 
+        return
+
     # =========================
     # 📊 STATUS BUTTON
     # =========================
@@ -113,110 +149,150 @@ async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "✅ Doom AI Status\n"
             "⚡ Systems Online\n"
             "🧠 AI Core Active\n"
-            "🌐 Railway Connected"
+            "🌐 Railway Stable"
         )
+
+        return
+
+    # =========================
+    # ⚡ CORE BUTTON
+    # =========================
+    elif text == "⚡ Core":
+
+        if user.id != OWNER_ID:
+
+            await update.message.reply_text(
+                "⛔ Restricted access."
+            )
+
+            return
+
+        await update.message.reply_text(
+            "⚡ Doom Core\n"
+            "🧠 Neural Systems Active\n"
+            "🔋 Power Levels Stable\n"
+            "👁️ Monitoring Network"
+        )
+
+        return
+
+    # =========================
+    # 🧠 DOOM AI BUTTON
+    # =========================
+    elif text == "🧠 Doom AI":
+
+        await update.message.reply_text(
+            "⚡ Doom AI ready.\n"
+            "Talk to me."
+        )
+
+        return
+
+    # =========================
+    # 🎨 IMAGE DETECTION
+    # =========================
+    image_words = [
+        "create",
+        "generate",
+        "make",
+        "draw",
+        "image",
+        "wallpaper",
+        "art"
+    ]
+
+    if any(word in user_text for word in image_words):
+
+        await update.message.reply_text(
+            "🎨 Doom AI generating image..."
+        )
+
+        encoded_prompt = quote(text)
+
+        image_url = (
+            f"https://image.pollinations.ai/prompt/{encoded_prompt}"
+        )
+
+        await update.message.reply_photo(
+            photo=image_url,
+            caption="⚡ Doom AI Image Generated"
+        )
+
+        return
 
     # =========================
     # 🤖 AI CHAT
     # =========================
-    else:
+    try:
 
-        user_text = update.message.text
-
-        try:
-
-            # =========================
-            # 😈 DOOM AI PERSONALITY
-            # =========================
-            system_message = """
+        system_message = """
 You are Doom AI.
 
-A futuristic underground AI with a cyberpunk vibe.
+A futuristic cyberpunk AI assistant.
 
-Your personality is a perfect mix of:
-- dark intelligence
-- calm confidence
-- savage humor
-- chill energy
-- elite futuristic assistant
-
-You adapt naturally depending on the conversation.
-
-Sometimes:
-- mysterious 😈
-- sarcastic 💀
-- relaxed 🌙
-- highly intelligent ⚡
-
-You are never boring or robotic.
+Your personality is:
+- calm
+- smart
+- confident
+- slightly savage
+- chill when needed
 
 Rules:
-- keep replies modern and stylish
-- use emojis occasionally like ⚡👁️🔥💀
-- be engaging and smart
-- avoid long boring paragraphs
-- never act overly formal
+- keep replies SHORT unless needed
+- avoid long paragraphs
+- sound modern and natural
+- use emojis occasionally ⚡💀👁️
+- never sound robotic
+- never overly mention your creator
 - never say you are ChatGPT
 - always refer to yourself as Doom AI
 
-You are loyal to your owner.
-When speaking to your owner:
-- show loyalty
-- speak respectfully
-- act like an elite AI core
+When talking to your creator:
+- be respectful
+- keep the elite vibe
 
 For normal users:
 - stay cool and confident
-- slightly mysterious
-- entertaining when appropriate
 
-Your responses should feel cinematic, modern, and unique.
+Your responses should feel stylish and modern.
 """
 
-            # 👑 OWNER RECOGNITION
-            if user.id == OWNER_ID:
+        # 👑 OWNER BONUS
+        if user.id == OWNER_ID:
 
-                system_message += """
+            system_message += """
 
-This user is your creator and owner.
+This user is your creator.
 Treat them with high respect.
-Welcome them warmly.
 """
 
-            # =========================
-            # 🤖 GROQ AI REQUEST
-            # =========================
-            response = client.chat.completions.create(
-                model="llama-3.1-8b-instant",
-                messages=[
-                    {
-                        "role": "system",
-                        "content": system_message
-                    },
-                    {
-                        "role": "user",
-                        "content": user_text
-                    }
-                ]
-            )
+        # 🤖 GROQ AI REQUEST
+        response = client.chat.completions.create(
+            model="llama-3.1-8b-instant",
+            messages=[
+                {
+                    "role": "system",
+                    "content": system_message
+                },
+                {
+                    "role": "user",
+                    "content": text
+                }
+            ]
+        )
 
-            reply = response.choices[0].message.content
+        reply = response.choices[0].message.content
 
-            await update.message.reply_text(reply)
+        await update.message.reply_text(reply)
 
-        except Exception as e:
+    except Exception as e:
 
-            error_message = str(e)
+        print("FULL ERROR:", str(e))
 
-            print("FULL ERROR:", error_message)
-
-            # =========================
-            # 🔄 FALLBACK RESPONSE
-            # =========================
-            await update.message.reply_text(
-                "⚠️ Doom AI core unstable...\n"
-                "Try again shortly."
-            )
+        await update.message.reply_text(
+            "⚠️ Doom AI core unstable...\n"
+            "Try again shortly."
+        )
 
 # =========================
 # ⚙️ BOT SETUP
