@@ -1,5 +1,7 @@
 import os
+import json
 from urllib.parse import quote
+from datetime import datetime
 
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import (
@@ -32,6 +34,8 @@ OWNERS = {
     }
 }
 
+USER_LOG_FILE = "users.json"
+
 if not TOKEN or not GROQ_API_KEY:
     raise ValueError("Missing Railway Variables")
 
@@ -42,41 +46,57 @@ client = OpenAI(
 )
 
 # =========================
-# 👋 START COMMAND
+# 🧠 USER LOGGER
+# =========================
+def log_user(user):
+    try:
+        try:
+            with open(USER_LOG_FILE, "r") as f:
+                data = json.load(f)
+        except:
+            data = {}
+
+        data[str(user.id)] = {
+            "name": user.first_name,
+            "username": user.username,
+            "last_seen": str(datetime.now())
+        }
+
+        with open(USER_LOG_FILE, "w") as f:
+            json.dump(data, f, indent=4)
+
+    except Exception as e:
+        print("LOG ERROR:", e)
+
+
+# =========================
+# 👋 START
 # =========================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user = update.effective_user
 
+    owner_keyboard = [
+        ["👑 Admin", "👤 Profile"],
+        ["📊 Status", "⚡ Core"],
+        ["🧠 Doom AI", "👑 Owner Info"],
+        ["👥 Users"]
+    ]
+
+    user_keyboard = [
+        ["👤 Profile", "📊 Status"],
+        ["🧠 Doom AI"],
+        ["👑 Owner Info"]
+    ]
+
     if user.id in OWNER_IDS:
-
-        keyboard = [
-            ["👑 Admin", "👤 Profile"],
-            ["📊 Status", "⚡ Core"],
-            ["🧠 Doom AI", "👑 Owner Info"]
-        ]
-
-        text = (
-            "👑 Welcome back, boss.\n"
-            "⚡ Doom AI systems online."
-        )
-
+        keyboard = owner_keyboard
+        text = "👑 Welcome back, boss.\n⚡ Doom AI systems online."
     else:
+        keyboard = user_keyboard
+        text = "⚡ Doom AI Online\n😈 Futuristic AI Assistant"
 
-        keyboard = [
-            ["👤 Profile", "📊 Status"],
-            ["🧠 Doom AI"]
-        ]
-
-        text = (
-            "⚡ Doom AI Online\n"
-            "😈 Futuristic AI Assistant"
-        )
-
-    reply_markup = ReplyKeyboardMarkup(
-        keyboard,
-        resize_keyboard=True
-    )
+    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
     await update.message.reply_text(text, reply_markup=reply_markup)
 
@@ -95,7 +115,7 @@ async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # =========================
-# 🎛 BUTTON HANDLER
+# 🎛 BUTTONS
 # =========================
 async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
@@ -103,7 +123,7 @@ async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     user_text = text.lower()
 
-    # log_user(user)  # (optional if you added users.json system)
+    log_user(user)
 
     # =========================
     # 👑 ADMIN
@@ -187,6 +207,35 @@ async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # =========================
+    # 👥 USERS (OWNER ONLY)
+    # =========================
+    elif text == "👥 Users":
+
+        if user.id not in OWNER_IDS:
+            await update.message.reply_text("⛔ Access denied.")
+            return
+
+        try:
+            with open(USER_LOG_FILE, "r") as f:
+                data = json.load(f)
+
+            msg = "👥 Doom AI Users:\n\n"
+
+            for uid, info in data.items():
+                msg += (
+                    f"🆔 {uid}\n"
+                    f"👤 {info['name']}\n"
+                    f"📱 @{info['username']}\n"
+                    f"⏰ {info['last_seen']}\n\n"
+                )
+
+            await update.message.reply_text(msg[:4000])
+
+        except:
+            await update.message.reply_text("No users found yet.")
+        return
+
+    # =========================
     # 🧠 AZELF DETECTION
     # =========================
     if "azelf" in user_text:
@@ -265,7 +314,7 @@ Rules:
 
 
 # =========================
-# ⚙️ BOT SETUP
+# ⚙️ BOT START
 # =========================
 app = ApplicationBuilder().token(TOKEN).build()
 
