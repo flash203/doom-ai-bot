@@ -18,9 +18,19 @@ from openai import OpenAI
 TOKEN = os.getenv("TOKEN")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
-# 👑 OWNER DETAILS
-OWNER_ID = 8252102529
-OWNER_USERNAME = "@Alphaxdoom"
+# 👑 MULTI OWNERS
+OWNER_IDS = [8252102529, 8283699735]
+
+OWNERS = {
+    8252102529: {
+        "name": "Azelf",
+        "username": "@Alphaxdoom"
+    },
+    8283699735: {
+        "name": "The one",
+        "username": "@daddytheone"
+    }
+}
 
 if not TOKEN or not GROQ_API_KEY:
     raise ValueError("Missing Railway Variables")
@@ -38,7 +48,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user = update.effective_user
 
-    if user.id == OWNER_ID:
+    if user.id in OWNER_IDS:
 
         keyboard = [
             ["👑 Admin", "👤 Profile"],
@@ -93,12 +103,14 @@ async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     user_text = text.lower()
 
+    # log_user(user)  # (optional if you added users.json system)
+
     # =========================
     # 👑 ADMIN
     # =========================
     if text == "👑 Admin":
 
-        if user.id != OWNER_ID:
+        if user.id not in OWNER_IDS:
             await update.message.reply_text("⛔ Access denied.")
             return
 
@@ -110,17 +122,12 @@ async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # =========================
     elif text == "👤 Profile":
 
-        role = "👑 Owner" if user.id == OWNER_ID else "⚡ User"
-
-        extra = ""
-        if user.id == OWNER_ID:
-            extra = f"\n📱 Username: {OWNER_USERNAME}"
+        role = "👑 Owner" if user.id in OWNER_IDS else "⚡ User"
 
         await update.message.reply_text(
             f"👤 Name: {user.first_name}\n"
             f"🆔 ID: {user.id}\n"
             f"🎭 Role: {role}"
-            f"{extra}"
         )
         return
 
@@ -142,7 +149,7 @@ async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # =========================
     elif text == "⚡ Core":
 
-        if user.id != OWNER_ID:
+        if user.id not in OWNER_IDS:
             await update.message.reply_text("⛔ Restricted access.")
             return
 
@@ -165,21 +172,18 @@ async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # =========================
-    # 👑 OWNER INFO (NEW)
+    # 👑 OWNER INFO (PUBLIC)
     # =========================
     elif text == "👑 Owner Info":
 
-        if user.id != OWNER_ID:
-            await update.message.reply_text("⛔ Access denied.")
-            return
+        msg = "👑 Doom AI Owners\n\n"
 
-        await update.message.reply_text(
-            "👑 Doom AI Owner Info\n\n"
-            "🧠 Created by: Azelf\n"
-            f"📱 Telegram: {OWNER_USERNAME}\n"
-            "⚡ System designed and built by Azelf\n"
-            "💀 Doom AI core belongs to him"
-        )
+        for owner_id, info in OWNERS.items():
+            msg += f"• {info['name']} ({info['username']})\n"
+
+        msg += "\n⚡ System built and managed by the owners"
+
+        await update.message.reply_text(msg)
         return
 
     # =========================
@@ -237,8 +241,8 @@ Rules:
 - always call yourself Doom AI
 """
 
-        if user.id == OWNER_ID:
-            system_message += "\nThis user is your creator. Show respect."
+        if user.id in OWNER_IDS:
+            system_message += "\nThis user is one of your creators. Show respect."
 
         response = client.chat.completions.create(
             model="llama-3.1-8b-instant",
