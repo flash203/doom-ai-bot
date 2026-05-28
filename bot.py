@@ -1,6 +1,4 @@
 import os
-import time
-import sqlite3
 from urllib.parse import quote
 
 from telegram import Update, ReplyKeyboardMarkup
@@ -20,264 +18,404 @@ from openai import OpenAI
 TOKEN = os.getenv("TOKEN")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
+# 👑 OWNERS
 OWNER_IDS = [8252102529, 8283699735]
 
 OWNERS = {
-    8252102529: {"name": "Azelf", "username": "@Alphaxdoom"},
-    8283699735: {"name": "The one", "username": "@daddytheone"}
+    8252102529: {
+        "name": "Azelf",
+        "username": "@Alphaxdoom"
+    },
+    8283699735: {
+        "name": "Co Owner",
+        "username": "@daddytheone"
+    }
 }
 
-if not TOKEN or not GROQ_API_KEY:
-    raise ValueError("Missing variables")
+# =========================
+# 🤖 BOT STATUS
+# =========================
+BOT_ACTIVE = True
 
+# =========================
+# 👥 USERS STORAGE
+# =========================
+users = set()
+
+# =========================
+# 📢 BROADCAST MODE
+# =========================
+broadcast_mode = {}
+
+# =========================
+# 🤖 GROQ CLIENT
+# =========================
 client = OpenAI(
     api_key=GROQ_API_KEY,
     base_url="https://api.groq.com/openai/v1"
 )
 
 # =========================
-# 🧠 SQLITE DATABASE
-# =========================
-db = sqlite3.connect("doom.db", check_same_thread=False)
-cursor = db.cursor()
-
-cursor.execute("""
-CREATE TABLE IF NOT EXISTS users (
-    user_id INTEGER PRIMARY KEY,
-    name TEXT,
-    username TEXT,
-    last_seen TEXT,
-    banned INTEGER DEFAULT 0
-)
-""")
-
-cursor.execute("""
-CREATE TABLE IF NOT EXISTS memory (
-    user_id INTEGER PRIMARY KEY,
-    last_message TEXT
-)
-""")
-
-db.commit()
-
-# =========================
-# 🧠 DB FUNCTIONS
-# =========================
-def save_user(user):
-    cursor.execute("""
-    INSERT OR REPLACE INTO users (user_id, name, username, last_seen)
-    VALUES (?, ?, ?, ?)
-    """, (user.id, user.first_name, user.username, time.ctime()))
-    db.commit()
-
-def is_banned(user_id):
-    cursor.execute("SELECT banned FROM users WHERE user_id=?", (user_id,))
-    row = cursor.fetchone()
-    return row and row[0] == 1
-
-def ban_user(user_id):
-    cursor.execute("UPDATE users SET banned=1 WHERE user_id=?", (user_id,))
-    db.commit()
-
-def unban_user(user_id):
-    cursor.execute("UPDATE users SET banned=0 WHERE user_id=?", (user_id,))
-    db.commit()
-
-def save_memory(user_id, text):
-    cursor.execute("""
-    INSERT OR REPLACE INTO memory (user_id, last_message)
-    VALUES (?, ?)
-    """, (user_id, text))
-    db.commit()
-
-def get_memory(user_id):
-    cursor.execute("SELECT last_message FROM memory WHERE user_id=?", (user_id,))
-    row = cursor.fetchone()
-    return row[0] if row else ""
-
-def get_user_count():
-    cursor.execute("SELECT COUNT(*) FROM users")
-    return cursor.fetchone()[0]
-
-# =========================
-# 🚀 START
+# 🚀 START COMMAND
 # =========================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user = update.effective_user
 
+    users.add(user.id)
+
+    # 👑 OWNER MENU
     owner_keyboard = [
         ["👑 Admin", "👤 Profile"],
-        ["📊 Status", "⚡ Core"],
-        ["🧠 Doom AI", "👑 Owner Info"],
-        ["👥 Users", "🚫 Ban", "✅ Unban"]
-    ]
-
-    user_keyboard = [
-        ["👤 Profile", "📊 Status"],
-        ["🧠 Doom AI"],
         ["👑 Owner Info"]
     ]
 
-    keyboard = owner_keyboard if user.id in OWNER_IDS else user_keyboard
+    # 👤 USER MENU
+    user_keyboard = [
+        ["👤 Profile"],
+        ["👑 Owner Info"]
+    ]
+
+    keyboard = (
+        owner_keyboard
+        if user.id in OWNER_IDS
+        else user_keyboard
+    )
+
+    # 👑 OWNER MESSAGE
+    if user.id in OWNER_IDS:
+
+        text = (
+            "👑 Creator detected.\n"
+            "⚡ Doom AI systems activated."
+        )
+
+    # 👤 USER MESSAGE
+    else:
+
+        text = (
+            "⚡ Doom AI Activated\n"
+            "👁️ Welcome, human."
+        )
 
     await update.message.reply_text(
-        "💀 Doom AI Pro v5 Online",
-        reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+        text,
+        reply_markup=ReplyKeyboardMarkup(
+            keyboard,
+            resize_keyboard=True
+        )
     )
 
 # =========================
-# 🎛 HANDLER
+# 🎛 MAIN HANDLER
 # =========================
 async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    global BOT_ACTIVE
 
     text = update.message.text
     user = update.effective_user
     user_text = text.lower()
 
-    # 🚫 banned check
-    if is_banned(user.id):
-        await update.message.reply_text("⛔ You are banned.")
+    users.add(user.id)
+
+    # =========================
+    # 🔴 BOT OFFLINE
+    # =========================
+    if not BOT_ACTIVE and user.id not in OWNER_IDS:
+
+        await update.message.reply_text(
+            "🔴 Doom AI is currently offline."
+        )
+
         return
 
-    save_user(user)
+    # =========================
+    # 👑 ADMIN PANEL
+    # =========================
+    if text == "👑 Admin":
+
+        if user.id not in OWNER_IDS:
+
+            await update.message.reply_text(
+                "⛔ Access denied."
+            )
+
+            return
+
+        admin_keyboard = [
+            ["📢 Send Message"],
+            ["⏸️ Hold Bot"],
+            ["🔙 Back"]
+        ]
+
+        await update.message.reply_text(
+            "👑 Doom AI Admin Panel",
+            reply_markup=ReplyKeyboardMarkup(
+                admin_keyboard,
+                resize_keyboard=True
+            )
+        )
+
+        return
+
+    # =========================
+    # 🔙 BACK BUTTON
+    # =========================
+    if text == "🔙 Back":
+
+        keyboard = [
+            ["👑 Admin", "👤 Profile"],
+            ["👑 Owner Info"]
+        ]
+
+        await update.message.reply_text(
+            "⚡ Returned to main menu.",
+            reply_markup=ReplyKeyboardMarkup(
+                keyboard,
+                resize_keyboard=True
+            )
+        )
+
+        return
+
+    # =========================
+    # ⏸️ HOLD BOT
+    # =========================
+    if text == "⏸️ Hold Bot":
+
+        if user.id not in OWNER_IDS:
+            return
+
+        BOT_ACTIVE = not BOT_ACTIVE
+
+        if BOT_ACTIVE:
+
+            await update.message.reply_text(
+                "🟢 Doom AI is now ONLINE."
+            )
+
+        else:
+
+            await update.message.reply_text(
+                "🔴 Doom AI is now OFFLINE."
+            )
+
+        return
+
+    # =========================
+    # 📢 SEND MESSAGE MODE
+    # =========================
+    if text == "📢 Send Message":
+
+        if user.id not in OWNER_IDS:
+            return
+
+        broadcast_mode[user.id] = True
+
+        await update.message.reply_text(
+            "📢 Send the message you want to broadcast."
+        )
+
+        return
+
+    # =========================
+    # 📢 BROADCAST
+    # =========================
+    if user.id in broadcast_mode:
+
+        del broadcast_mode[user.id]
+
+        sent = 0
+
+        for uid in users:
+
+            try:
+
+                await context.bot.send_message(
+                    chat_id=uid,
+                    text=(
+                        "📢 Doom AI Announcement\n\n"
+                        f"{text}"
+                    )
+                )
+
+                sent += 1
+
+            except:
+                pass
+
+        await update.message.reply_text(
+            f"✅ Message sent to {sent} users."
+        )
+
+        return
 
     # =========================
     # 👤 PROFILE
     # =========================
     if text == "👤 Profile":
-        role = "👑 Owner" if user.id in OWNER_IDS else "⚡ User"
+
+        role = (
+            "👑 Owner"
+            if user.id in OWNER_IDS
+            else "⚡ User"
+        )
 
         await update.message.reply_text(
             f"👤 Name: {user.first_name}\n"
-            f"🆔 {user.id}\n"
-            f"🎭 {role}"
+            f"🆔 ID: {user.id}\n"
+            f"🎭 Role: {role}"
         )
-        return
 
-    # =========================
-    # 📊 STATUS
-    # =========================
-    if text == "📊 Status":
-        await update.message.reply_text(
-            f"💀 Doom AI v5\n"
-            f"👥 Users: {get_user_count()}\n"
-            f"⚡ Online"
-        )
         return
 
     # =========================
     # 👑 OWNER INFO
     # =========================
     if text == "👑 Owner Info":
-        msg = "👑 Owners\n\n"
-        for o in OWNERS.values():
-            msg += f"• {o['name']} ({o['username']})\n"
+
+        msg = "👑 Doom AI Owners\n\n"
+
+        for info in OWNERS.values():
+
+            msg += (
+                f"• {info['name']} "
+                f"({info['username']})\n"
+            )
+
+        msg += "\n⚡ System built by the owners"
 
         await update.message.reply_text(msg)
+
         return
 
     # =========================
-    # 👥 USERS (OWNER ONLY)
+    # 🧠 AZELF DETECTION
     # =========================
-    if text == "👥 Users":
+    if "azelf" in user_text:
 
-        if user.id not in OWNER_IDS:
-            await update.message.reply_text("⛔ Access denied.")
-            return
+        await update.message.reply_text(
+            "🧠 Azelf is one of my creators."
+        )
 
-        cursor.execute("SELECT * FROM users")
-        rows = cursor.fetchall()
-
-        msg = "👥 Users List\n\n"
-        for r in rows:
-            msg += f"{r[0]} | {r[1]} | @{r[2]} | banned={r[4]}\n"
-
-        await update.message.reply_text(msg[:4000])
         return
 
     # =========================
-    # 🚫 BAN
+    # 🎨 IMAGE GENERATION
     # =========================
-    if text == "🚫 Ban":
+    image_words = [
+        "create",
+        "generate",
+        "draw",
+        "image",
+        "art",
+        "wallpaper",
+        "make"
+    ]
 
-        if user.id not in OWNER_IDS:
-            return
+    if any(word in user_text.split() for word in image_words):
 
         try:
-            target = int(context.args[0])
-            ban_user(target)
-            await update.message.reply_text(f"🚫 Banned {target}")
-        except:
-            await update.message.reply_text("Usage: /ban USER_ID")
+
+            await update.message.reply_text(
+                "🎨 Doom AI generating image..."
+            )
+
+            image_url = (
+                "https://image.pollinations.ai/prompt/"
+                f"{quote(text, safe='')}"
+            )
+
+            await update.message.reply_photo(
+                photo=image_url,
+                caption="⚡ Doom AI Generated"
+            )
+
+        except Exception as e:
+
+            print("IMAGE ERROR:", e)
+
+            await update.message.reply_text(
+                "⚠️ Image generation failed."
+            )
+
         return
 
     # =========================
-    # ✅ UNBAN
-    # =========================
-    if text == "✅ Unban":
-
-        if user.id not in OWNER_IDS:
-            return
-
-        try:
-            target = int(context.args[0])
-            unban_user(target)
-            await update.message.reply_text(f"✅ Unbanned {target}")
-        except:
-            await update.message.reply_text("Usage: /unban USER_ID")
-        return
-
-    # =========================
-    # 🧠 MEMORY
-    # =========================
-    save_memory(user.id, text)
-    memory = get_memory(user.id)
-
-    # =========================
-    # 🎨 IMAGE
-    # =========================
-    if any(w in user_text for w in ["create", "draw", "image", "art"]):
-        url = f"https://image.pollinations.ai/prompt/{quote(text, safe='')}"
-        await update.message.reply_photo(photo=url)
-        return
-
-    # =========================
-    # 🤖 AI
+    # 🤖 AI CHAT
     # =========================
     try:
 
-        system = f"""
-You are Doom AI v5.
+        system_message = """
+You are Doom AI.
 
-Short, smart, powerful.
+A futuristic cyberpunk AI assistant.
 
-Memory: {memory}
+Personality:
+- smart
+- calm
+- confident
+- stylish
+- modern
+
+Rules:
+- keep replies short
+- avoid nonsense
+- sound natural
+- use emojis occasionally ⚡
+- never say ChatGPT
+- always act like Doom AI
 """
+
+        if user.id in OWNER_IDS:
+
+            system_message += (
+                "\nThis user is one of your creators."
+            )
 
         response = client.chat.completions.create(
             model="llama-3.1-8b-instant",
             messages=[
-                {"role": "system", "content": system},
-                {"role": "user", "content": text}
+                {
+                    "role": "system",
+                    "content": system_message
+                },
+                {
+                    "role": "user",
+                    "content": text
+                }
             ]
         )
 
+        reply = response.choices[0].message.content
+
+        await update.message.reply_text(reply)
+
+    except Exception as e:
+
+        print("AI ERROR:", e)
+
         await update.message.reply_text(
-            response.choices[0].message.content
+            "⚠️ Doom AI encountered an error."
         )
 
-    except:
-        await update.message.reply_text("⚠️ Error")
-
-
 # =========================
-# 🚀 RUN
+# 🚀 BOT START
 # =========================
 app = ApplicationBuilder().token(TOKEN).build()
 
-app.add_handler(CommandHandler("start", start))
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, buttons))
+app.add_handler(
+    CommandHandler("start", start)
+)
 
-print("💀 Doom AI Pro v5 Running...")
+app.add_handler(
+    MessageHandler(
+        filters.TEXT & ~filters.COMMAND,
+        buttons
+    )
+)
+
+print("🤖 Doom AI Running...")
+
 app.run_polling()
